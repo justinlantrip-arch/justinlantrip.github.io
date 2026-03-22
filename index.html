@@ -995,15 +995,6 @@
         </div>
 
       </div>
-
-      <!-- Spotify Player -->
-      <div class="spotify-section fade-in">
-        <p class="section-label" style="margin-top: 3rem;">Stream</p>
-        <h3 style="font-family: var(--font-display); font-size: 1.5rem; font-weight: 400; margin-bottom: 1.5rem;">Listen on Spotify</h3>
-        <div class="spotify-embed">
-          <iframe style="border-radius:12px" src="https://open.spotify.com/embed/artist/1dlU7abjd8uONOlshE2TzX?utm_source=generator&theme=0" width="100%" height="352" frameborder="0" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -1024,6 +1015,15 @@
           Get the App
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
         </a>
+      </div>
+
+      <!-- Spotify Player -->
+      <div class="spotify-section fade-in">
+        <p class="section-label" style="margin-top: 3rem;">Also On</p>
+        <h3 style="font-family: var(--font-display); font-size: 1.5rem; font-weight: 400; margin-bottom: 1.5rem;">Spotify</h3>
+        <div class="spotify-embed">
+          <iframe style="border-radius:12px" src="https://open.spotify.com/embed/artist/1dlU7abjd8uONOlshE2TzX?utm_source=generator&theme=0" width="100%" height="352" frameborder="0" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+        </div>
       </div>
     </div>
   </section>
@@ -1248,8 +1248,10 @@
           date = new Date(y, m, d, h, min);
         }
 
+        const hasTime = dtStart.length >= 13 && dtStart.includes('T');
+
         if (date && summary) {
-          events.push({ date, summary, location, description });
+          events.push({ date, hasTime, summary, location, description });
         }
       }
 
@@ -1271,9 +1273,18 @@
       container.innerHTML = events.map(e => {
         const venue = e.summary || 'TBA';
         const loc = e.location || '';
-        // Split location into venue name and city if possible
         const locParts = loc.split(',').map(s => s.trim());
         const city = locParts.length > 1 ? locParts.slice(-2).join(', ') : loc;
+
+        // Format time (e.g. "7:00 PM")
+        let timeStr = '';
+        if (e.hasTime) {
+          let h = e.date.getHours();
+          const min = e.date.getMinutes();
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          h = h % 12 || 12;
+          timeStr = min > 0 ? `${h}:${String(min).padStart(2,'0')} ${ampm}` : `${h} ${ampm}`;
+        }
 
         return `
           <div class="show-item">
@@ -1285,6 +1296,7 @@
             <div class="show-details">
               <h3>${venue}</h3>
               ${city ? `<p class="show-location">${city}</p>` : ''}
+              ${timeStr ? `<p class="show-venue" style="color: var(--accent);">${timeStr}</p>` : ''}
               ${e.description ? `<p class="show-venue">${e.description.substring(0, 100)}</p>` : ''}
             </div>
           </div>

@@ -455,6 +455,85 @@
     }
 
     /* ============================================
+       SHOWS
+       ============================================ */
+    .shows {
+      background: var(--bg-primary);
+    }
+
+    .show-item {
+      display: grid;
+      grid-template-columns: 80px 1fr auto;
+      gap: 1.5rem;
+      align-items: center;
+      padding: 1.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .show-item:last-child { border-bottom: none; }
+
+    .show-date {
+      text-align: center;
+    }
+
+    .show-date .month {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .show-date .day {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      color: var(--text-primary);
+      line-height: 1.1;
+    }
+
+    .show-date .year {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .show-details h3 {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 400;
+      margin-bottom: 0.2rem;
+    }
+
+    .show-details .show-venue {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .show-details .show-location {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .show-action .hero-cta {
+      font-size: 0.75rem;
+      padding: 0.5rem 1.2rem;
+    }
+
+    .shows-loading {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 2rem;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 650px) {
+      .show-item {
+        grid-template-columns: 60px 1fr;
+        gap: 1rem;
+      }
+      .show-action { grid-column: 1 / -1; text-align: center; }
+    }
+
+    /* ============================================
        PHOTOS / GALLERY
        ============================================ */
     .gallery {
@@ -745,6 +824,7 @@
       <li><a href="#about">About</a></li>
       <li><a href="#music">Music</a></li>
       <li><a href="#fountain">Fountain</a></li>
+      <li><a href="#shows">Shows</a></li>
       <li><a href="#photos">Photos</a></li>
       <li><a href="#press">Press</a></li>
       <li><a href="#connect">Connect</a></li>
@@ -948,6 +1028,23 @@
     </div>
   </section>
 
+  <!-- ===== SHOWS ===== -->
+  <section class="shows" id="shows">
+    <div class="section-container">
+      <p class="section-label fade-in">Live</p>
+      <h2 class="section-title fade-in">Upcoming Shows</h2>
+      <div class="section-divider"></div>
+
+      <div id="shows-list" class="fade-in">
+        <div class="shows-loading">Loading shows...</div>
+      </div>
+
+      <div id="shows-fallback" class="fade-in" style="display: none;">
+        <p style="color: var(--text-secondary); text-align: center; padding: 2rem 0;">No upcoming shows scheduled right now. Follow me on <a href="https://www.instagram.com/trippitydippity" target="_blank">Instagram</a> for announcements.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- ===== PHOTOS ===== -->
   <section class="gallery" id="photos">
     <div class="section-container">
@@ -1060,7 +1157,7 @@
 
   <!-- ===== FOOTER ===== -->
   <footer>
-    <p>&copy; 2025 Justin Lantrip. All rights reserved. &nbsp;|&nbsp; Value your intangibles.</p>
+    <p>&copy; 2025 Justin Lantrip. All rights reserved. &nbsp;|&nbsp; Songs for what we're building and what we carry.</p>
   </footer>
 
   <!-- ===== SCRIPTS ===== -->
@@ -1110,6 +1207,110 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeLightbox();
     });
+
+    // ===== iCal Shows Integration =====
+    const ICAL_URL = 'https://p28-caldav.icloud.com/published/2/MTExNTA0NjY5MTExNTA0Nokj_zIBLt_gqRVe1rCEK1WmjfvYV96HGhKoHzhTOQQ_Z4cDCO1dcrOi6Ar7LPRu-nkfU7qlsBVv2ssFt6jjmkYSdDz87m_cP2FjEf7wTEveF-UgJz-q-Q2slguJXqpHVw';
+    const CORS_PROXIES = [
+      'https://api.allorigins.win/raw?url=',
+      'https://corsproxy.io/?'
+    ];
+
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    function parseICS(text) {
+      const events = [];
+      const blocks = text.split('BEGIN:VEVENT');
+      blocks.shift(); // remove preamble
+
+      for (const block of blocks) {
+        const get = (key) => {
+          const regex = new RegExp(key + '[^:]*:(.+)', 'm');
+          const match = block.match(regex);
+          return match ? match[1].trim() : '';
+        };
+
+        const dtStart = get('DTSTART');
+        const summary = get('SUMMARY').replace(/\\\\/g, '').replace(/\\,/g, ',').replace(/\\n/g, ' ');
+        const location = get('LOCATION').replace(/\\\\/g, '').replace(/\\,/g, ',').replace(/\\n/g, ', ');
+        const description = get('DESCRIPTION').replace(/\\\\/g, '').replace(/\\,/g, ',').replace(/\\n/g, ' ');
+
+        // Parse date (handles YYYYMMDD and YYYYMMDDTHHMMSS formats)
+        let date;
+        if (dtStart.length >= 8) {
+          const y = parseInt(dtStart.substring(0, 4));
+          const m = parseInt(dtStart.substring(4, 6)) - 1;
+          const d = parseInt(dtStart.substring(6, 8));
+          let h = 0, min = 0;
+          if (dtStart.length >= 13) {
+            h = parseInt(dtStart.substring(9, 11));
+            min = parseInt(dtStart.substring(11, 13));
+          }
+          date = new Date(y, m, d, h, min);
+        }
+
+        if (date && summary) {
+          events.push({ date, summary, location, description });
+        }
+      }
+
+      return events
+        .filter(e => e.date >= new Date(new Date().setHours(0,0,0,0)))
+        .sort((a, b) => a.date - b.date);
+    }
+
+    function renderShows(events) {
+      const container = document.getElementById('shows-list');
+      const fallback = document.getElementById('shows-fallback');
+
+      if (!events || events.length === 0) {
+        container.style.display = 'none';
+        fallback.style.display = 'block';
+        return;
+      }
+
+      container.innerHTML = events.map(e => {
+        const venue = e.summary || 'TBA';
+        const loc = e.location || '';
+        // Split location into venue name and city if possible
+        const locParts = loc.split(',').map(s => s.trim());
+        const city = locParts.length > 1 ? locParts.slice(-2).join(', ') : loc;
+
+        return `
+          <div class="show-item">
+            <div class="show-date">
+              <div class="month">${MONTHS[e.date.getMonth()]}</div>
+              <div class="day">${e.date.getDate()}</div>
+              <div class="year">${e.date.getFullYear()}</div>
+            </div>
+            <div class="show-details">
+              <h3>${venue}</h3>
+              ${city ? `<p class="show-location">${city}</p>` : ''}
+              ${e.description ? `<p class="show-venue">${e.description.substring(0, 100)}</p>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function loadShows() {
+      for (const proxy of CORS_PROXIES) {
+        try {
+          const res = await fetch(proxy + encodeURIComponent(ICAL_URL));
+          if (!res.ok) continue;
+          const text = await res.text();
+          if (text.includes('BEGIN:VCALENDAR')) {
+            const events = parseICS(text);
+            renderShows(events);
+            return;
+          }
+        } catch (e) { /* try next proxy */ }
+      }
+      // All proxies failed — show fallback
+      document.getElementById('shows-list').style.display = 'none';
+      document.getElementById('shows-fallback').style.display = 'block';
+    }
+
+    loadShows();
 
     // Album card expand on mobile (click to toggle tracklist)
     document.querySelectorAll('.album-card').forEach(card => {

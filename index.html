@@ -1230,28 +1230,31 @@
         };
 
         const dtStart = get('DTSTART');
+        const dtEnd = get('DTEND');
         const summary = get('SUMMARY').replace(/\\\\/g, '').replace(/\\,/g, ',').replace(/\\n/g, ' ');
         const location = get('LOCATION').replace(/\\\\/g, '').replace(/\\,/g, ',').replace(/\\n/g, ', ');
         const description = get('DESCRIPTION').replace(/\\\\/g, '').replace(/\\,/g, ',').replace(/\\n/g, ' ');
 
-        // Parse date (handles YYYYMMDD and YYYYMMDDTHHMMSS formats)
-        let date;
-        if (dtStart.length >= 8) {
-          const y = parseInt(dtStart.substring(0, 4));
-          const m = parseInt(dtStart.substring(4, 6)) - 1;
-          const d = parseInt(dtStart.substring(6, 8));
+        // Parse a date string (handles YYYYMMDD and YYYYMMDDTHHMMSS formats)
+        function parseDT(dt) {
+          if (!dt || dt.length < 8) return null;
+          const y = parseInt(dt.substring(0, 4));
+          const m = parseInt(dt.substring(4, 6)) - 1;
+          const d = parseInt(dt.substring(6, 8));
           let h = 0, min = 0;
-          if (dtStart.length >= 13) {
-            h = parseInt(dtStart.substring(9, 11));
-            min = parseInt(dtStart.substring(11, 13));
+          if (dt.length >= 13) {
+            h = parseInt(dt.substring(9, 11));
+            min = parseInt(dt.substring(11, 13));
           }
-          date = new Date(y, m, d, h, min);
+          return new Date(y, m, d, h, min);
         }
 
+        const date = parseDT(dtStart);
+        const endDate = parseDT(dtEnd);
         const hasTime = dtStart.length >= 13 && dtStart.includes('T');
 
         if (date && summary) {
-          events.push({ date, hasTime, summary, location, description });
+          events.push({ date, endDate, hasTime, summary, location, description });
         }
       }
 
@@ -1270,20 +1273,46 @@
         return;
       }
 
+      function formatTime(d) {
+        let h = d.getHours();
+        const min = d.getMinutes();
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return min > 0 ? `${h}:${String(min).padStart(2,'0')} ${ampm}` : `${h} ${ampm}`;
+      }
+
+      function extractCityState(loc) {
+        if (!loc) return '';
+        // Location often comes as "Venue Name, Street, City, State ZIP, Country"
+        // We want just "City, State"
+        const parts = loc.split(',').map(s => s.trim());
+        if (parts.length >= 3) {
+          // Grab the city and state portions (usually 2nd-to-last and last before country/zip)
+          // Try to find a part that looks like a state (2 letters or state name + zip)
+          const stateZip = parts.find(p => /\b[A-Z]{2}\b/.test(p) && !/^\d+/.test(p));
+          const stateIdx = stateZip ? parts.indexOf(stateZip) : parts.length - 2;
+          const city = parts[Math.max(stateIdx - 1, 0)];
+          // Clean zip/country from state
+          const state = (stateZip || parts[stateIdx]).replace(/\s*\d{5}(-\d{4})?/, '').replace(/\s*(US|USA|United States)$/i, '').trim();
+          if (city && state && city !== state) return `${city}, ${state}`;
+          if (state) return state;
+        }
+        // Fallback: if only 2 parts, return the last one (likely city or city, state)
+        if (parts.length === 2) return parts[1];
+        return loc;
+      }
+
       container.innerHTML = events.map(e => {
         const venue = e.summary || 'TBA';
-        const loc = e.location || '';
-        const locParts = loc.split(',').map(s => s.trim());
-        const city = locParts.length > 1 ? locParts.slice(-2).join(', ') : loc;
+        const cityState = extractCityState(e.location);
 
-        // Format time (e.g. "7:00 PM")
+        // Format time range (e.g. "7 PM - 10 PM")
         let timeStr = '';
         if (e.hasTime) {
-          let h = e.date.getHours();
-          const min = e.date.getMinutes();
-          const ampm = h >= 12 ? 'PM' : 'AM';
-          h = h % 12 || 12;
-          timeStr = min > 0 ? `${h}:${String(min).padStart(2,'0')} ${ampm}` : `${h} ${ampm}`;
+          timeStr = formatTime(e.date);
+          if (e.endDate) {
+            timeStr += ' \u2013 ' + formatTime(e.endDate);
+          }
         }
 
         return `
@@ -1295,7 +1324,7 @@
             </div>
             <div class="show-details">
               <h3>${venue}</h3>
-              ${city ? `<p class="show-location">${city}</p>` : ''}
+              ${cityState ? `<p class="show-location">${cityState}</p>` : ''}
               ${timeStr ? `<p class="show-venue" style="color: var(--accent);">${timeStr}</p>` : ''}
               ${e.description ? `<p class="show-venue">${e.description.substring(0, 100)}</p>` : ''}
             </div>
